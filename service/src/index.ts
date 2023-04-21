@@ -1,15 +1,23 @@
 import express from 'express'
+import dotenv from 'dotenv'
+import cors from 'cors'
 import type { RequestProps } from './types'
 import type { ChatMessage } from './chatgpt'
 import { chatConfig, chatReplyProcess, currentModel } from './chatgpt'
-import { auth } from './middleware/auth'
-import { limiter } from './middleware/limiter'
+import { authMiddleware } from './middleware/auth'
 import { isNotEmptyString } from './utils/is'
+import { limiter } from './middleware/limiter'
+import { AuthService } from './services/auth-service'
+
+dotenv.config()
 
 const app = express()
 const router = express.Router()
 
 app.use(express.static('public'))
+app.use(cors({
+  origin: '*',
+}))
 app.use(express.json())
 
 app.all('*', (_, res, next) => {
@@ -19,7 +27,7 @@ app.all('*', (_, res, next) => {
   next()
 })
 
-router.post('/chat-process', [auth, limiter], async (req, res) => {
+router.post('/chat-process', [authMiddleware, limiter], async (req, res) => {
   res.setHeader('Content-type', 'application/octet-stream')
 
   try {
@@ -45,7 +53,7 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
   }
 })
 
-router.post('/config', auth, async (req, res) => {
+router.post('/config', authMiddleware, async (req, res) => {
   try {
     const response = await chatConfig()
     res.send(response)
@@ -82,8 +90,31 @@ router.post('/verify', async (req, res) => {
   }
 })
 
+router.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body
+    const a = new AuthService()
+    const result = await a.login(username, password)
+    if (!result)
+      res.status(400).send('用户名或密码错误')
+    else
+      res.send({ status: 'Success', message: 'login success', data: result })
+  }
+  catch (e) {
+    console.error(e)
+    res.status(400).send(e.message)
+  }
+})
+
 app.use('', router)
+// 将路由挂载到应用程序上，前缀为/api
 app.use('/api', router)
+
+// 设置代理信任级别为1
 app.set('trust proxy', 1)
 
-app.listen(3002, () => globalThis.console.log('Server is running on port 3002'))
+// app.listen(3002, () => globalThis.console.log('Server is running on port 3002'))
+const PORT = process.env.PORT || 3002
+app.listen(PORT, () => {
+  globalThis.console.log('Server is running on port %d', PORT)
+})
