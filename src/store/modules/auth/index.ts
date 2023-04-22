@@ -9,19 +9,28 @@ interface SessionResponse {
 }
 
 export interface AuthState {
+  username: string | undefined
   token: string | undefined
   session: SessionResponse | null
 }
 
 export const useAuthStore = defineStore('auth-store', {
   state: (): AuthState => ({
+    username: undefined,
     token: getToken(),
     session: null,
   }),
 
   getters: {
-    isChatGPTAPI(state): boolean {
-      return state.session?.model === 'ChatGPTAPI'
+    // isChatGPTAPI(state): boolean {
+    //   return state.session?.model === 'ChatGPTAPI'
+    // },
+    isChatGPTAPI(): boolean {
+      return true
+    },
+
+    currentUsername(state): string {
+      return state.username as string
     },
   },
 
@@ -43,6 +52,7 @@ export const useAuthStore = defineStore('auth-store', {
         login(username, password)
           .then((res) => {
             this.setToken(res.data as string)
+            this.username = username
             resolve(res.status as string)
           })
           .catch((error) => {
