@@ -32,6 +32,10 @@ export const useAuthStore = defineStore('auth-store', {
     currentUsername(state): string {
       return state.username as string
     },
+
+    isSuper(state): boolean {
+      return state.username === 'wilson'
+    },
   },
 
   actions: {

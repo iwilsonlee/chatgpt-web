@@ -48,7 +48,7 @@ const show = computed({
             <General />
           </div>
         </NTabPane>
-        <NTabPane v-if="authStore.currentUsername === 'wilson'" name="Advanced" tab="Advanced">
+        <NTabPane v-if="authStore.isSuper" name="Advanced" tab="Advanced">
           <template #tab>
             <SvgIcon class="text-lg" icon="ri:equalizer-line" />
             <span class="ml-2">{{ $t('setting.advanced') }}</span>
