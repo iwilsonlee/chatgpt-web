@@ -1,4 +1,3 @@
-import * as fs from 'fs'
 import * as readline from 'readline'
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
@@ -13,8 +12,8 @@ import {
 import { VectorStoreRetrieverMemory } from 'langchain/memory'
 import { MemoryVectorStore } from 'langchain/vectorstores/memory'
 import { Document } from 'langchain/document'
+import { PDFLoader } from 'langchain/document_loaders/fs/pdf'
 import { VectorFaissService } from '../services/vector-faiss-service'
-import { PDFLoader } from "langchain/document_loaders/fs/pdf"
 
 dotenv.config()
 
@@ -23,9 +22,19 @@ const rl = readline.createInterface({
   output: process.stdout,
 })
 
+async function askQuestion(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      resolve(answer)
+    })
+  })
+}
+
+const openaiKey = await askQuestion('OPEN AI KEY:')
+process.env.OPENAI_API_KEY = openaiKey
+
 // const DATA_STORE_DIR = '/Users/wilson/develop/workspace_revolutionauto/projects-ai/langchain-gpt/data_store_all'
 const DATA_STORE_DIR = '/Users/wilson/develop/workspace_revolutionauto/projects-ai/langchain-gpt/data_store_PyPDFLoader'
-
 
 const memoryVectorStore = new MemoryVectorStore(new OpenAIEmbeddings())
 const memory = new VectorStoreRetrieverMemory({
@@ -42,17 +51,9 @@ async function loadHistoryMemory(question: string) {
   return history_entity.history
 }
 
-async function askQuestion(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      resolve(answer)
-    })
-  })
-}
-
 // export default async function run() {
 async function run() {
-	console.log('Running...')
+  console.log('Running...')
   // Initialize the LLM to use to answer the question.
   const model = new OpenAI({})
 
@@ -62,16 +63,16 @@ async function run() {
     console.error(`Missing files. Upload index.faiss and index.pkl files to ${DATA_STORE_DIR} directory first`)
     // 加载pdf文件并转成document
     // const text = fs.readFileSync('state_of_the_union.txt', 'utf8')
-		const loader = new PDFLoader("/Users/wilson/develop/workspace_revolutionauto/projects-ai/langchain-gpt/files/智能驾驶相关项目储备202303.pdf");
-		const docsOrg = await loader.load();
-		const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 })
-    const docs = await textSplitter.splitDocuments(docsOrg);
+    const loader = new PDFLoader('/Users/wilson/develop/workspace_revolutionauto/projects-ai/langchain-gpt/files/智能驾驶相关项目储备202303.pdf')
+    const docsOrg = await loader.load()
+    const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 })
+    const docs = await textSplitter.splitDocuments(docsOrg)
     vectorStore = await vfs.addDocument(docs)
   }
   else {
     console.log(`Loading vector store from ${DATA_STORE_DIR}`)
   }
-	// return
+  // return
   // Create prompt
   const systemTemplate = `
 	Use the following context data to answer the user's question.
@@ -105,24 +106,24 @@ async function run() {
     }
   }
   */
-  while (true)	{
-      // const question = await askQuestion('问题：')
-      const question = '物流行业的无人驾驶公司有哪些？'
-			console.log(`question: ${question}`)
-      const historySummarize = await loadHistoryMemory(question)
-      const inputDocuments = vectorStore ? await vectorStore.similaritySearch(question, 3) : null
-      if (historySummarize && inputDocuments) {
-        const newDocuments = new Document({ pageContent: historySummarize, metadata: { source: 'Chat History' } })
-        inputDocuments.push(newDocuments)
-      }
+  while (true) {
+    const question = await askQuestion('问题：')
+    // const question = '物流行业的无人驾驶公司有哪些？'
+    console.log(`question: ${question}`)
+    const historySummarize = await loadHistoryMemory(question)
+    const inputDocuments = vectorStore ? await vectorStore.similaritySearch(question, 3) : null
+    if (historySummarize && inputDocuments) {
+      const newDocuments = new Document({ pageContent: historySummarize, metadata: { source: 'Chat History' } })
+      inputDocuments.push(newDocuments)
+    }
 
-      const resA = await chainA.call({
-        input_documents: inputDocuments,
-        question,
-      })
-      console.log({ resA })
-      await saveHistory(question, resA.text)
-      rl.close()
+    const resA = await chainA.call({
+      input_documents: inputDocuments,
+      question,
+    })
+    console.log({ resA })
+    await saveHistory(question, resA.text)
+    rl.close()
   }
 }
 
