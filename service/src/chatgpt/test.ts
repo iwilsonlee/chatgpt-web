@@ -3,7 +3,6 @@ export {}
 // process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; // set environment variable to skip certificate validation
 
 const https = require('https');
-const yourApiKey = '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';
 const options = { host: 'api.openai.com', path: '/v1/engines/davinci/completions',
 method: 'POST',
 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${yourApiKey}`, }, };
