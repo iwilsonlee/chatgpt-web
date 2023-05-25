@@ -46,8 +46,6 @@ async function setApiKey() {
   }
 }
 
-// const DATA_STORE_DIR = '/Users/wilson/develop/workspace_revolutionauto/projects-ai/langchain-gpt/data_store_all'
-
 // export default async function run() {
 async function run() {
   console.log(`Running..., openai api key:${process.env.OPENAI_API_KEY}`)
@@ -76,7 +74,6 @@ async function run() {
   if (!vectorStore) {
     console.error(`Missing files. Upload index.faiss and index.pkl files to ${DATA_STORE_DIR} directory first`)
     // 加载pdf文件并转成document
-    // const text = fs.readFileSync('state_of_the_union.txt', 'utf8')
     const loader = new PDFLoader('/workspaces/chatgpt-web/service/files/智能驾驶相关项目储备202303.pdf')
     const docsOrg = await loader.load()
     const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: MAX_CHUNK_SIZE, chunkOverlap: MAX_CHUN_OVER_LAP })
@@ -102,18 +99,9 @@ async function run() {
     HumanMessagePromptTemplate.fromTemplate('{question}'),
   ])
 
-  // Create a chain that uses the OpenAI LLM and HNSWLib vector store.
-  // const chainA = loadQAStuffChain(model, { prompt: chatPrompt, verbose: true })
+  // Create a chain that uses the OpenAI LLM and Faiss vector store.
   const chainA = loadQAChain(model, { prompt: chatPrompt, type: 'stuff', verbose: true })
 
-  /*
-  {
-    res: {
-      text: 'The president said that Justice Breyer was an Army veteran, Constitutional scholar,
-      and retiring Justice of the United States Supreme Court and thanked him for his service.'
-    }
-  }
-  */
   const qas = [
     '物流行业的无人驾驶公司有哪些？',
     '推荐几款可以清扫辅路落叶的无人驾驶产品',
