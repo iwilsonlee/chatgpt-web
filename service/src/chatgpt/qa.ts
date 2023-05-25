@@ -9,16 +9,16 @@ import {
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
 import { OpenAI } from 'langchain/llms/openai'
+import type { MapReduceDocumentsChain, QAChainParams, RefineDocumentsChain, StuffDocumentsChain } from 'langchain/chains'
 import { loadQAChain } from 'langchain/chains'
 import * as dotenv from 'dotenv'
 import { MemoryVectorStore } from 'langchain/vectorstores/memory'
 import { VectorStoreRetrieverMemory } from 'langchain/memory'
 import { Document } from 'langchain/document'
 import { PDFLoader } from 'langchain/document_loaders/fs/pdf'
+import type { BaseLLM } from 'langchain/llms'
+import type { SaveableVectorStore } from 'langchain/vectorstores'
 import { VectorFaissService } from '../services/vector-faiss-service'
-import { BaseLLM } from "langchain/llms"
-import { StuffDocumentsChain, MapReduceDocumentsChain, RefineDocumentsChain } from 'langchain/chains'
-import { SaveableVectorStore } from 'langchain/vectorstores'
 
 dotenv.config()
 
@@ -31,48 +31,48 @@ const rl = readline.createInterface({
 })
 
 class TaogeMemory {
-	private embeddings: OpenAIEmbeddings;
-  private memory: VectorStoreRetrieverMemory;
-	private memoryStore: MemoryVectorStore;
+  private embeddings: OpenAIEmbeddings
+  private memory: VectorStoreRetrieverMemory
+  private memoryStore: MemoryVectorStore
 
   constructor(embeddings?: OpenAIEmbeddings) {
-		this.embeddings = embeddings? embeddings: new OpenAIEmbeddings()
-		this.memoryStore = new MemoryVectorStore(this.embeddings)
+    this.embeddings = embeddings || new OpenAIEmbeddings()
+    this.memoryStore = new MemoryVectorStore(this.embeddings)
     this.memory = new VectorStoreRetrieverMemory({
       vectorStoreRetriever: this.memoryStore.asRetriever(3),
       memoryKey: 'history',
-    });
+    })
   }
 
   async saveHistory(input: string, output: string) {
-    await this.memory.saveContext({ input }, { output });
+    await this.memory.saveContext({ input }, { output })
   }
 
   async loadHistoryMemory(question: string) {
-    const history_entity = await this.memory.loadMemoryVariables({ prompt: question });
-    console.log(`history_entity=${JSON.stringify(history_entity)}`);
-    return history_entity.history;
+    const history_entity = await this.memory.loadMemoryVariables({ prompt: question })
+    console.log(`history_entity=${JSON.stringify(history_entity)}`)
+    return history_entity.history
   }
 }
 
 class TaogeQA {
-  private llm: BaseLLM;
-	private chain: StuffDocumentsChain | MapReduceDocumentsChain | RefineDocumentsChain;
-	private verbose: boolean = false
-	private memory: TaogeMemory
-	private vectorStore: SaveableVectorStore
+  private llm: BaseLLM
+  private chain: StuffDocumentsChain | MapReduceDocumentsChain | RefineDocumentsChain
+  private verbose = false
+  private memory: TaogeMemory
+  private vectorStore: SaveableVectorStore
 
-	constructor(llm: BaseLLM, embeddings: OpenAIEmbeddings, vectorStore: SaveableVectorStore, params?: any) {
-		const { type='stuff', verbose=false } = params
-		this.verbose = verbose
-		this.llm = llm;
-		this.memory = new TaogeMemory(embeddings)
-		this.vectorStore = vectorStore
-		this.chain = loadQAChain(this.llm, { prompt: this.createPrompt(), type: type, verbose: this.verbose })
-	}
+  constructor(llm: BaseLLM, embeddings: OpenAIEmbeddings, vectorStore: SaveableVectorStore, params: QAChainParams = {}) {
+    const { type = 'stuff', verbose = false } = params
+    this.verbose = verbose
+    this.llm = llm
+    this.memory = new TaogeMemory(embeddings)
+    this.vectorStore = vectorStore
+    this.chain = loadQAChain(this.llm, { prompt: this.createPrompt(), type, verbose: this.verbose })
+  }
 
-	private createPrompt():ChatPromptTemplate {
-		const systemTemplate = `
+  private createPrompt(): ChatPromptTemplate {
+    const systemTemplate = `
 		Use the following context data to answer the user's question.
 		If you don't know, just say "Sorry, I don't know.", don't try to make up any answer.
 		\"""
@@ -81,37 +81,54 @@ class TaogeQA {
 
 		You need to answer the question in the same language as the language in which the question is being asked. For example, if the question is in Chinese, you need to answer in Chinese.
 		`
-  	const chatPrompt = ChatPromptTemplate.fromPromptMessages([
-  	  SystemMessagePromptTemplate.fromTemplate(systemTemplate),
-  	  HumanMessagePromptTemplate.fromTemplate('{question}'),
-  	])
-		return chatPrompt
-	}
+    const chatPrompt = ChatPromptTemplate.fromPromptMessages([
+      SystemMessagePromptTemplate.fromTemplate(systemTemplate),
+      HumanMessagePromptTemplate.fromTemplate('{question}'),
+    ])
+    return chatPrompt
+  }
 
-	private async generateContext(question: string) {
-		const historySummarize = await this.memory.loadHistoryMemory(question)
+  private async generateContext(question: string) {
+    const historySummarize = await this.memory.loadHistoryMemory(question)
     const inputDocuments = await this.vectorStore.similaritySearch(question, 2)
     if (historySummarize && inputDocuments) {
       const newDocuments = new Document({ pageContent: historySummarize, metadata: { source: 'Chat History' } })
       inputDocuments.push(newDocuments)
     }
-	}
+    return inputDocuments
+  }
 
-	public async call(question: string, maxTokens?: 256) {
-		const inputDocuments = await this.generateContext(question)
-		const res = await this.chain.call({
-      input_documents: inputDocuments,
-      question,
-      max_tokens: maxTokens,
-    })
-		if(res &&	res.text) {
-			await this.memory.saveHistory(question, res.text)
-		}
-		return res.text
-	}
+  private filterString(inputString: string): string {
+    if (inputString.startsWith('\noutput:\n'))
+      inputString = inputString.replace('\noutput:\n', '')
+    if (inputString.startsWith('output:'))
+      inputString = inputString.replace('output:', '')
+    if (inputString.startsWith('\n'))
+      inputString = inputString.slice(1)
+    return inputString
+  }
 
+  public async call(question: string, maxTokens?: 256) {
+    const inputDocuments = await this.generateContext(question)
+    let res
+    let n = 0
+    while ((!res || !res.text) && n < 3) {
+      res = await this.chain.call({
+        input_documents: inputDocuments,
+        question,
+        max_tokens: maxTokens,
+      })
+      if (res &&	res.text) {
+        await this.memory.saveHistory(question, res.text)
+      }
+      else {
+        n++
+        console.log(`chain call result is null, try again n=${n}`)
+      }
+    }
+    return this.filterString(res.text)
+  }
 }
-
 
 async function askQuestion(question: string): Promise<string> {
   return new Promise((resolve) => {
@@ -157,7 +174,7 @@ async function run() {
   }
   // return
 
-	const taogeQA = new TaogeQA(model, embeddings, vectorStore)
+  const taogeQA = new TaogeQA(model, embeddings, vectorStore)
 
   const qas = [
     '物流行业的无人驾驶公司有哪些？',
@@ -169,11 +186,12 @@ async function run() {
   while (n < qas.length) {
     // const question = await askQuestion('问题：')
     const question = qas[n]
+    console.log('>>>>>>>>>>>>>>>>>>>>>>>>>>')
     console.log(`question: ${question}`)
 
-		const answer = await taogeQA.call(question, 256)
+    const answer = await taogeQA.call(question, 256)
 
-    console.log(`Answer: ${answer ? answer : 'nothing'}`)
+    console.log(`Answer: ${answer || 'nothing'}`)
     n++
     // rl.close()
   }
