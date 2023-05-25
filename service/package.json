@@ -38,6 +38,7 @@
     "jsonwebtoken": "^9.0.0",
     "langchain": "^0.0.81",
     "node-fetch": "^3.3.0",
+    "pdf-parse": "^1.1.1",
     "pickleparser": "^0.1.0",
     "socks-proxy-agent": "^7.0.0",
     "winston": "^3.8.2"

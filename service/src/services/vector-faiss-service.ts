@@ -2,24 +2,35 @@ import * as fs from 'fs'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
 import { FaissStore } from 'langchain/vectorstores/faiss'
 import type { Document } from 'langchain/document'
+import * as dotenv from 'dotenv'
+
+dotenv.config()
 
 export class VectorFaissService {
   public vectorStore: FaissStore | null = null
-  private embeddings: OpenAIEmbeddings = new OpenAIEmbeddings()
+  private embeddings: OpenAIEmbeddings = new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY })
   private vector_store_path: string
-  public constructor(vector_store_path: string) {
+  public constructor(vector_store_path: string, embeddings: OpenAIEmbeddings) {
     this.vector_store_path = vector_store_path
+    this.embeddings = embeddings
   }
 
-	public async loadDefaultVectorStore(): Promise<FaissStore> {
-		if (fs.existsSync(this.vector_store_path)) {
+  public async loadDefaultVectorStore(): Promise<FaissStore> {
+    if (fs.existsSync(this.vector_store_path))
       await this.loadVectorStore(this.vector_store_path)
-		}
-		return this.vectorStore
-	}
+
+    return this.vectorStore
+  }
 
   private async initVector(documents: Document[]) {
-    this.vectorStore = await FaissStore.fromDocuments(documents, this.embeddings)
+    try {
+      console.log(`this.embeddings=${this.embeddings}`)
+      this.vectorStore = await FaissStore.fromDocuments(documents, this.embeddings)
+    }
+    catch (error) {
+      console.error(`initVector found error: ${error}`)
+    }
+    console.log(`initVector this.vectorStore=${this.vectorStore}`)
     this.vectorStore.save(this.vector_store_path)
   }
 
@@ -40,15 +51,18 @@ export class VectorFaissService {
   }
 
   public async loadVectorStore(path?: string): Promise<FaissStore> {
-    if (!path) {
-			console.log(`Loading vector store at vector_store_path=${this.vector_store_path}`)
+    if (!path)
+      console.log(`Loading vector store at vector_store_path=${this.vector_store_path}`)
+    path = this.vector_store_path
+    if (!fs.existsSync(`${path}/index.faiss`) || !fs.existsSync(`${path}/index.pkl`)) {
+      return null
+    }
+    else {
+      console.log(`Loading vector store at path=${path}`)
       this.vectorStore = await FaissStore.loadFromPython(this.vector_store_path, this.embeddings)
-		} else {
-			console.log(`Loading vector store at path=${path}`)
-      this.vectorStore = await FaissStore.loadFromPython(path, this.embeddings)
-			console.log(`Loading vector store at vectorStore=${this.vectorStore}`)
-		}
-    return this.vectorStore!
+      console.log(`Loading vector store at vectorStore=${this.vectorStore}`)
+      return this.vectorStore
+    }
   }
 
   public similaritySearch(question: string, k = 3): any {

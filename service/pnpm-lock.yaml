@@ -39,10 +39,13 @@ dependencies:
     version: 9.0.0
   langchain:
     specifier: ^0.0.81
-    version: 0.0.81(axios@1.3.4)(faiss-node@0.1.1)(pickleparser@0.1.0)
+    version: 0.0.81(axios@1.3.4)(faiss-node@0.1.1)(pdf-parse@1.1.1)(pickleparser@0.1.0)
   node-fetch:
     specifier: ^3.3.0
     version: 3.3.0
+  pdf-parse:
+    specifier: ^1.1.1
+    version: 1.1.1
   pickleparser:
     specifier: ^0.1.0
     version: 0.1.0
@@ -1303,7 +1306,6 @@ packages:
         optional: true
     dependencies:
       ms: 2.1.3
-    dev: true
 
   /debug@4.3.4:
     resolution: {integrity: sha512-PRWFHuSU3eDtQJPvnNY7Jcket1j0t5OuOsFzPPzsekD52Zl8qUfFIPEiswXqIvHWGVHOgX+7G/vCNNhehwxfkQ==}
@@ -2822,7 +2824,7 @@ packages:
     resolution: {integrity: sha512-Xq9nH7KlWZmXAtodXDDRE7vs6DU1gTU8zYDHDiWLSip45Egwq3plLHzPn27NgvzL2r1LMPC1vdqh98sQxtqj4A==}
     dev: false
 
-  /langchain@0.0.81(axios@1.3.4)(faiss-node@0.1.1)(pickleparser@0.1.0):
+  /langchain@0.0.81(axios@1.3.4)(faiss-node@0.1.1)(pdf-parse@1.1.1)(pickleparser@0.1.0):
     resolution: {integrity: sha512-G4UOijTSA4Q8Anqn2Hdq3P4c2w2zJryAffh90kS5x2Lv+MugM/vPPcZXy9y3kZIET7Hdj/KTpkFOCofejpvWHA==}
     engines: {node: '>=18'}
     peerDependencies:
@@ -2956,6 +2958,7 @@ packages:
       openai: 3.2.1
       p-queue: 6.6.2
       p-retry: 4.6.2
+      pdf-parse: 1.1.1
       pickleparser: 0.1.0
       uuid: 9.0.0
       yaml: 2.2.1
@@ -3249,6 +3252,10 @@ packages:
   /node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
+    dev: false
+
+  /node-ensure@0.0.0:
+    resolution: {integrity: sha512-DRI60hzo2oKN1ma0ckc6nQWlHU69RH6xN0sjQTjMpChPfTYvKZdcQFfdYK2RWbJcKyUizSIy/l8OTGxMAM1QDw==}
     dev: false
 
   /node-fetch@2.6.11:
@@ -3560,6 +3567,16 @@ packages:
     resolution: {integrity: sha512-gDKb8aZMDeD/tZWs9P6+q0J9Mwkdl6xMV8TjnGP3qJVJ06bdMgkbBlLU8IdfOsIsFz2BW1rNVT3XuNEl8zPAvw==}
     engines: {node: '>=8'}
     dev: true
+
+  /pdf-parse@1.1.1:
+    resolution: {integrity: sha512-v6ZJ/efsBpGrGGknjtq9J/oC8tZWq0KWL5vQrk2GlzLEQPUDB1ex+13Rmidl1neNN358Jn9EHZw5y07FFtaC7A==}
+    engines: {node: '>=6.8.1'}
+    dependencies:
+      debug: 3.2.7
+      node-ensure: 0.0.0
+    transitivePeerDependencies:
+      - supports-color
+    dev: false
 
   /pickleparser@0.1.0:
     resolution: {integrity: sha512-L81sYaXj6JlEOtVPwhXsEjlDQ0fjxPGf9ay4uBfQnsrR87mZ8SFQR/OD8kdqjQdeyMFcWyCMhx7WKZT1yZK7FQ==}
