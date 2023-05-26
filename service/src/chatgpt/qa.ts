@@ -90,6 +90,7 @@ class TaogeQA {
 
   private async generateContext(question: string) {
     const historySummarize = await this.memory.loadHistoryMemory(question)
+    console.log(`historySummarize=${historySummarize}`)
     const inputDocuments = await this.vectorStore.similaritySearch(question, 2)
     if (historySummarize && inputDocuments) {
       const newDocuments = new Document({ pageContent: historySummarize, metadata: { source: 'Chat History' } })
@@ -98,20 +99,26 @@ class TaogeQA {
     return inputDocuments
   }
 
+  // 如果传进来的字符串是有下列开头的就去掉：'\noutput:\n'、'\noutput: \n'、'\noutput:'、'output:'、'\n'
   private filterString(inputString: string): string {
     if (inputString.startsWith('\noutput:\n'))
       inputString = inputString.replace('\noutput:\n', '')
+    if (inputString.startsWith('\noutput: \n'))
+      inputString = inputString.replace('\noutput: \n', '')
+    if (inputString.startsWith('\noutput:'))
+      inputString = inputString.replace('\noutput:', '')
     if (inputString.startsWith('output:'))
       inputString = inputString.replace('output:', '')
-    if (inputString.startsWith('\n'))
-      inputString = inputString.slice(1)
-    return inputString
+    const regex = /^\n+/
+    const result = inputString.replace(regex, '')
+    return result
   }
 
   public async call(question: string, maxTokens?: 256) {
     const inputDocuments = await this.generateContext(question)
     let res
     let n = 0
+    let answer = ''
     while ((!res || !res.text) && n < 3) {
       res = await this.chain.call({
         input_documents: inputDocuments,
@@ -119,15 +126,20 @@ class TaogeQA {
         max_tokens: maxTokens,
       })
       if (res &&	res.text) {
-        await this.memory.saveHistory(question, res.text)
+        answer = this.filterString(res.text)
+        await this.memory.saveHistory(question, answer)
       }
       else {
         n++
-        console.log(`chain call result is null, try again n=${n}`)
+        console.log(`chain call result is null, try again 1 second later, n=${n}`)
+        // sleep 1 second
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
     }
-    return this.filterString(res.text)
+    return answer
   }
+
+  // 过滤字符串，将
 }
 
 async function askQuestion(question: string): Promise<string> {
@@ -156,7 +168,7 @@ async function run() {
   const embeddings = new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY })
 
   // Initialize the LLM to use to answer the question.
-  const model = new OpenAI({ openAIApiKey: process.env.OPENAI_API_KEY })
+  const model = new OpenAI({ modelName: 'gpt-3.5-turbo', openAIApiKey: process.env.OPENAI_API_KEY })
 
   const vfs = new VectorFaissService(DATA_STORE_DIR, embeddings)
   let vectorStore = await vfs.loadDefaultVectorStore()
@@ -179,7 +191,7 @@ async function run() {
   const qas = [
     '物流行业的无人驾驶公司有哪些？',
     '推荐几款可以清扫辅路落叶的无人驾驶产品',
-    '介绍一下于万智驾这家公司',
+    // '介绍一下于万智驾这家公司',
     '于万智驾有哪些产品？',
     'Clear 1是哪家公司的产品?']
   let n = 0
