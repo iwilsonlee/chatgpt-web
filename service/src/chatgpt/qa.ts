@@ -138,8 +138,6 @@ class TaogeQA {
     }
     return answer
   }
-
-  // 过滤字符串，将
 }
 
 async function askQuestion(question: string): Promise<string> {
