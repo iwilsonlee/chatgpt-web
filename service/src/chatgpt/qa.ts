@@ -124,7 +124,13 @@ class TaogeQA {
         input_documents: inputDocuments,
         question,
         max_tokens: maxTokens,
-      })
+      }, [
+        {
+          handleLLMNewToken(token: string) {
+            console.log({ token })
+          },
+        },
+      ])
       if (res &&	res.text) {
         answer = this.filterString(res.text)
         await this.memory.saveHistory(question, answer)
@@ -166,7 +172,7 @@ async function run() {
   const embeddings = new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY })
 
   // Initialize the LLM to use to answer the question.
-  const model = new OpenAI({ modelName: 'gpt-3.5-turbo', openAIApiKey: process.env.OPENAI_API_KEY })
+  const model = new OpenAI({ modelName: 'gpt-3.5-turbo', openAIApiKey: process.env.OPENAI_API_KEY, maxTokens: 256, streaming: true })
 
   const vfs = new VectorFaissService(DATA_STORE_DIR, embeddings)
   let vectorStore = await vfs.loadDefaultVectorStore()
@@ -190,8 +196,9 @@ async function run() {
     '物流行业的无人驾驶公司有哪些？',
     '推荐几款可以清扫辅路落叶的无人驾驶产品',
     // '介绍一下于万智驾这家公司',
-    '于万智驾有哪些产品？',
-    'Clear 1是哪家公司的产品?']
+    // '于万智驾有哪些产品？',
+    // 'Clear 1是哪家公司的产品?',
+  ]
   let n = 0
   while (n < qas.length) {
     // const question = await askQuestion('问题：')
