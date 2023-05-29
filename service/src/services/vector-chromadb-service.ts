@@ -1,10 +1,11 @@
+/* eslint-disable no-console */
 import * as fs from 'fs'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
 import { Chroma } from 'langchain/vectorstores/chroma'
 import type { Document } from 'langchain/document'
 
 export class VectorChromaService {
-	  private static collectionName = 'langchain'
+  private static collectionName = 'langchain'
   private vectorStore: Chroma | null = null
   private embeddings: OpenAIEmbeddings = new OpenAIEmbeddings()
   private vector_store_path: string

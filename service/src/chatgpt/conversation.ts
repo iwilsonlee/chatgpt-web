@@ -132,12 +132,13 @@ async function run() {
   }
 }
 
-// setApiKey().then((res) => {
-//   run()
-// }).catch((e) => {
-//   console.error(`setApiKey found error=&{e}`)
-// }).finally(() =>{
-//   rl.close()
-// })
+setApiKey().then((res) => {
+  console.log(`setApiKey res=${res}`)
+  run()
+}).catch((e) => {
+  console.error(`setApiKey found error=${e}`)
+}).finally(() => {
+  rl.close()
+})
 
-run()
+// run()
