@@ -22,15 +22,22 @@ export class VectorFaissService {
     return this.vectorStore
   }
 
+  public async loadDefaultVectorStoreFromPython(): Promise<FaissStore> {
+    if (fs.existsSync(this.vector_store_path))
+      await this.loadVectorStoreFromPython(this.vector_store_path)
+
+    return this.vectorStore
+  }
+
   private async initVector(documents: Document[]) {
     try {
-      console.log(`this.embeddings=${this.embeddings}`)
+      // console.log(`this.embeddings=${this.embeddings}`)
       this.vectorStore = await FaissStore.fromDocuments(documents, this.embeddings)
     }
     catch (error) {
-      console.error(`initVector found error: ${error}`)
+      // console.error(`initVector found error: ${error}`)
     }
-    console.log(`initVector this.vectorStore=${this.vectorStore}`)
+    // console.log(`initVector this.vectorStore=${this.vectorStore}`)
     this.vectorStore.save(this.vector_store_path)
   }
 
@@ -38,30 +45,58 @@ export class VectorFaissService {
     if (!documents)
       throw new Error('The value of the documents parameter is null, you need to assign it first.')
 
-    if (!this.vectorStore || !fs.existsSync(`${this.vector_store_path}/index.faiss`) || !fs.existsSync(`${this.vector_store_path}/index.pkl`)) {
-      console.log('new data to vector store.....')
+    if (!this.vectorStore || !fs.existsSync(`${this.vector_store_path}/faiss.index`) || !fs.existsSync(`${this.vector_store_path}/docstore.json`)) {
+      // console.log('new data to vector store.....')
       await this.initVector(documents)
     }
     else {
-      console.log('add data to vector store...')
+      // console.log('add data to vector store...')
       await this.vectorStore.addDocuments(documents)
-      // this.vectorStore.save("");
     }
     return this.vectorStore!
   }
 
   public async loadVectorStore(path?: string): Promise<FaissStore> {
-    if (!path)
-      console.log(`Loading vector store at vector_store_path=${this.vector_store_path}`)
-    path = this.vector_store_path
+    if (!path) {
+      // console.log(`Loading vector store at vector_store_path=${this.vector_store_path}`)
+      path = this.vector_store_path
+    }
+    if (!fs.existsSync(`${path}/faiss.index`) || !fs.existsSync(`${path}/docstore.json`)) {
+      return null
+    }
+    else {
+      // console.log(`Loading vector store at path=${path}`)
+      try {
+        this.vectorStore = await FaissStore.load(this.vector_store_path, this.embeddings)
+        // console.log(`Loading vector store at vectorStore=${this.vectorStore}`)
+        return this.vectorStore
+      }
+      catch (error) {
+        // console.error(`loadVectorStore found error: ${error}`)
+        return null
+      }
+    }
+  }
+
+  public async loadVectorStoreFromPython(path?: string): Promise<FaissStore> {
+    if (!path) {
+      // console.log(`Loading vector store at vector_store_path=${this.vector_store_path}`)
+      path = this.vector_store_path
+    }
     if (!fs.existsSync(`${path}/index.faiss`) || !fs.existsSync(`${path}/index.pkl`)) {
       return null
     }
     else {
-      console.log(`Loading vector store at path=${path}`)
-      this.vectorStore = await FaissStore.loadFromPython(this.vector_store_path, this.embeddings)
-      console.log(`Loading vector store at vectorStore=${this.vectorStore}`)
-      return this.vectorStore
+      // console.log(`Loading vector store at path=${path}`)
+      try {
+        this.vectorStore = await FaissStore.loadFromPython(this.vector_store_path, this.embeddings)
+        // console.log(`Loading vector store at vectorStore=${this.vectorStore}`)
+        return this.vectorStore
+      }
+      catch (error) {
+        // console.error(`loadVectorStore found error: ${error}`)
+        return null
+      }
     }
   }
 
