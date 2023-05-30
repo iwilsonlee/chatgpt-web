@@ -53,6 +53,16 @@ class TaogeMemory {
   }
 }
 
+/**
+ * TaogeQA is a question answering system that uses a LLM to answer questions.
+ * It uses a memory to store the history of questions and answers.
+ * It uses a vector store to store the documents that the LLM uses to answer questions.
+ * It uses a LLM to answer questions.
+ * It uses a chain to process the LLM results.
+ * It uses a prompt to generate the LLM input.
+ * It uses a prompt to generate the LLM output.
+ * It uses a prompt to generate the LLM context.
+ */
 export class TaogeQA {
   private llm: BaseLLM
   private chain: StuffDocumentsChain | MapReduceDocumentsChain | RefineDocumentsChain
