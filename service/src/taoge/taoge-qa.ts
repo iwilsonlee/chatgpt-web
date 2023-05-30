@@ -114,11 +114,11 @@ export class TaogeQA {
 
   public async call(question: string, options?, maxTokens?: 256): Promise<string> {
     const inputDocuments = await this.generateContext(question)
-    const { onMessage, onEnd } = options
+    const { onMessage, onEnd, onError } = options
     let res
     let n = 0
     let answer = ''
-    let callback = {} as { handleLLMNewToken?; handleLLMEnd? }
+    const callback = {} as { handleLLMNewToken?; handleLLMEnd?; handleLLMError? }
     if (onMessage) {
       // append handleLLMNewToken() to callback
       callback.handleLLMNewToken = (token: string, runId: string, parentRunId: string) => {
@@ -131,8 +131,10 @@ export class TaogeQA {
         onEnd?.(output, runId, parentRunId)
       }
     }
-    else {
-      callback = {}
+    if (onError) {
+      callback.handleLLMError = (error, runId, parentRunId) => {
+        onError?.(error, runId, parentRunId)
+      }
     }
     while ((!res || !res.text) && n < 3) {
       res = await this.chain.call({
