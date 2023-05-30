@@ -53,7 +53,7 @@ class TaogeMemory {
   }
 }
 
-class TaogeQA {
+export class TaogeQA {
   private llm: BaseLLM
   private chain: StuffDocumentsChain | MapReduceDocumentsChain | RefineDocumentsChain
   private verbose = false
@@ -112,29 +112,38 @@ class TaogeQA {
     return result
   }
 
-  public async call(question: string, options?, maxTokens?: 256) {
+  public async call(question: string, options?, maxTokens?: 256): Promise<string> {
     const inputDocuments = await this.generateContext(question)
     const { onMessage, onEnd } = options
     let res
     let n = 0
     let answer = ''
+    let callback = {} as { handleLLMNewToken?; handleLLMEnd? }
+    if (onMessage) {
+      // append handleLLMNewToken() to callback
+      callback.handleLLMNewToken = (token: string, runId: string, parentRunId: string) => {
+        // console.log({ token })
+        onMessage?.(token, runId, parentRunId)
+      }
+    }
+    if (onEnd) {
+      callback.handleLLMEnd = (output, runId, parentRunId) => {
+        onEnd?.(output, runId, parentRunId)
+      }
+    }
+    else {
+      callback = {}
+    }
     while ((!res || !res.text) && n < 3) {
       res = await this.chain.call({
         input_documents: inputDocuments,
         question,
         max_tokens: maxTokens,
       }, [
-        {
-          handleLLMNewToken(token: string, runId: string, parentRunId: string) {
-            // console.log({ token })
-            onMessage?.(token, runId, parentRunId)
-          },
-          handleLLMEnd(output, runId, parentRunId) {
-            onEnd?.(output, runId, parentRunId)
-          },
-        },
+        callback,
       ])
       if (res &&	res.text) {
+        console.log(`langchain res=${JSON.stringify(res)}`)
         answer = this.filterString(res.text)
         await this.memory.saveHistory(question, answer)
       }
@@ -170,9 +179,9 @@ class TaogeQA {
 
 // export default async function run() {
 export default async function run(question: string,
-  options: { onMessage: (data: string, runId: string, parentRunId: string) => void; onEnd: (output: LLMResult, runId: string, parentRunId: string) => void }) {
+  options?: { onMessage?: (data: string, runId: string, parentRunId: string) => void; onEnd?: (output: LLMResult, runId: string, parentRunId: string) => void }): Promise<string> {
   console.log(`Running..., openai api key:${process.env.OPENAI_API_KEY}`)
-  const DATA_STORE_DIR = '/workspaces/chatgpt-web/data_store_PyPDFLoader'
+  const DATA_STORE_DIR = '/workspaces/chatgpt-web/data_store_PyPDFLoader2'
   const embeddings = new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY })
 
   // Initialize the LLM to use to answer the question.
@@ -194,7 +203,7 @@ export default async function run(question: string,
 
   // return
 
-  const taogeQA = new TaogeQA(model, embeddings, vectorStore)
+  const taogeQA = new TaogeQA(model, embeddings, vectorStore, { verbose: true })
 
   // const qas = [
   //   '物流行业的无人驾驶公司有哪些？',

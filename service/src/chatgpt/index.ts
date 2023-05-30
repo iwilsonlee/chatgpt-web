@@ -1,13 +1,18 @@
+/* eslint-disable no-console */
 import * as dotenv from 'dotenv'
 import 'isomorphic-fetch'
 import { SocksProxyAgent } from 'socks-proxy-agent'
 import httpsProxyAgent from 'https-proxy-agent'
 import fetch from 'node-fetch'
+import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
+import { OpenAI } from 'langchain/llms/openai'
+import { TaogeQA } from '../taoge/taoge-qa'
 import type { ChatGPTAPIOptions, ChatMessage, SendMessageOptions } from '../taoge'
-import { ChatGPTAPI, ChatGPTUnofficialProxyAPI } from '../taoge'
+import { ChatGPTAPI } from '../taoge'
 import { sendResponse } from '../utils'
 import { isNotEmptyString } from '../utils/is'
-import type { ApiModel, ChatContext, ChatGPTUnofficialProxyAPIOptions, ModelConfig } from '../types'
+import type { ApiModel, ChatContext, ModelConfig } from '../types'
+import { VectorFaissService } from '../services/vector-faiss-service'
 import type { RequestOptions, SetProxyOptions, UsageResponse } from './types'
 
 const { HttpsProxyAgent } = httpsProxyAgent
@@ -32,7 +37,9 @@ const model = isNotEmptyString(process.env.OPENAI_API_MODEL) ? process.env.OPENA
 if (!isNotEmptyString(process.env.OPENAI_API_KEY) && !isNotEmptyString(process.env.OPENAI_ACCESS_TOKEN))
   throw new Error('Missing OPENAI_API_KEY or OPENAI_ACCESS_TOKEN environment variable')
 
-let api: ChatGPTAPI | ChatGPTUnofficialProxyAPI
+// let api: ChatGPTAPI | ChatGPTUnofficialProxyAPI
+let api: ChatGPTAPI
+let chain: TaogeQA
 
 (async () => {
   // More Info: https://github.com/transitive-bullshit/chatgpt-api
@@ -62,23 +69,32 @@ let api: ChatGPTAPI | ChatGPTUnofficialProxyAPI
     if (isNotEmptyString(OPENAI_API_BASE_URL))
       options.apiBaseUrl = `${OPENAI_API_BASE_URL}/v1`
 
-    setupProxy(options)
+    // setupProxy(options)
 
     api = new ChatGPTAPI({ ...options })
     apiModel = 'ChatGPTAPI'
-  }
-  else {
-    const options: ChatGPTUnofficialProxyAPIOptions = {
-      accessToken: process.env.OPENAI_ACCESS_TOKEN,
-      apiReverseProxyUrl: isNotEmptyString(process.env.API_REVERSE_PROXY) ? process.env.API_REVERSE_PROXY : 'https://bypass.churchless.tech/api/conversation',
-      model,
-      debug: !disableDebug,
-    }
 
-    setupProxy(options)
+    // Initialize the LLM to use to answer the question.
+    const DATA_STORE_DIR = '/workspaces/chatgpt-web/data_store_PyPDFLoader2'
+    const embeddings = new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY })
 
-    api = new ChatGPTUnofficialProxyAPI({ ...options })
-    apiModel = 'ChatGPTUnofficialProxyAPI'
+    // Initialize the LLM to use to answer the question.
+    const llm = new OpenAI({ modelName: 'gpt-3.5-turbo', openAIApiKey: process.env.OPENAI_API_KEY, temperature: 0.2, maxTokens: 256, streaming: true })
+
+    const vfs = new VectorFaissService(DATA_STORE_DIR, embeddings)
+    const vectorStore = await vfs.loadDefaultVectorStoreFromPython()
+    if (!vectorStore)
+      console.error(`Missing files. Upload index.faiss and index.pkl files to ${DATA_STORE_DIR} directory first`)
+      // 加载pdf文件并转成document
+      // const loader = new PDFLoader('/workspaces/chatgpt-web/service/files/智能驾驶相关项目储备202303.pdf')
+      // const docsOrg = await loader.load()
+      // const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: MAX_CHUNK_SIZE, chunkOverlap: MAX_CHUN_OVER_LAP })
+      // const docs = await textSplitter.splitDocuments(docsOrg)
+      // vectorStore = await vfs.addDocument(docs)
+
+    else
+      console.log(`Loading vector store from ${DATA_STORE_DIR}`)
+    chain = new TaogeQA(llm, embeddings, vectorStore, { verbose: true })
   }
 })()
 
@@ -100,9 +116,7 @@ async function chatReplyProcess(options: RequestOptions) {
         options = { ...lastContext }
     }
 
-    // const res = await run(message, process)
-
-    const response = await api.sendMessage(message, {
+    const response = await api.sendMessageByLangchain(message, chain, {
       ...options,
       onProgress: (partialResponse) => {
         process?.(partialResponse)

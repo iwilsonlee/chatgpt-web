@@ -7,8 +7,9 @@ import { v4 as uuidv4 } from 'uuid'
 
 import * as types from 'chatgpt'
 import { fetch as globalFetch } from './fetch'
+import { fetchSSE } from './fetch-sse'
 import * as tokenizer from './tokenizer'
-import run from './taoge-qa'
+import type { TaogeQA } from './taoge-qa'
 
 const CHATGPT_MODEL = 'gpt-3.5-turbo'
 
@@ -190,90 +191,47 @@ export class ChatGPTAPI {
           console.log(`sendMessage (${numTokens} tokens)`, body)
 
         if (stream) {
-          run(text, {
-            onMessage: (data: string, runId: string, parentRunId: string) => {
-              // if (data === '[DONE]') {
-              //   result.text = result.text.trim()
-              //   return resolve(result)
-              // }
-              try {
-                // const response: types.openai.CreateChatCompletionDeltaResponse
-                //   = JSON.parse(data)
-
-                if (runId) {
-                  result.id = runId
-                  result.parentMessageId = parentRunId
+          fetchSSE(
+            url,
+            {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body),
+              signal: abortSignal,
+              onMessage: (data: string) => {
+                if (data === '[DONE]') {
+                  result.text = result.text.trim()
+                  return resolve(result)
                 }
 
-                // if (response?.choices?.length) {
-                //   const delta = response.choices[0].delta
-                //   result.delta = delta.content
-                //   if (delta?.content)
-                //     result.text += delta.content
-                //   result.detail = response
+                try {
+                  const response: types.openai.CreateChatCompletionDeltaResponse
+                    = JSON.parse(data)
 
-                //   if (delta.role)
-                //     result.role = delta.role
+                  if (response.id)
+                    result.id = response.id
 
-                //   onProgress?.(result)
-                // }
-                if (data) {
-                  result.text += data
-                  onProgress?.(result)
+                  if (response?.choices?.length) {
+                    const delta = response.choices[0].delta
+                    result.delta = delta.content
+                    if (delta?.content)
+                      result.text += delta.content
+                    result.detail = response
+
+                    if (delta.role)
+                      result.role = delta.role
+
+                    onProgress?.(result)
+                  }
                 }
-              }
-              catch (err) {
-                console.warn('OpenAI stream SEE event unexpected error', err)
-                return reject(err)
-              }
+                catch (err) {
+                  console.warn('OpenAI stream SEE event unexpected error', err)
+                  return reject(err)
+                }
+              },
             },
-            onEnd: (output, runId, parentRunId) => {
-              console.log(`onEnd runId=${runId}, parentRunId=${parentRunId}, output=${output}`)
-              result.text = result.text.trim()
-              return resolve(result)
-            },
-          })
-          // fetchSSE(
-          //   url,
-          //   {
-          //     method: 'POST',
-          //     headers,
-          //     body: JSON.stringify(body),
-          //     signal: abortSignal,
-          //     onMessage: (data: string) => {
-          //       if (data === '[DONE]') {
-          //         result.text = result.text.trim()
-          //         return resolve(result)
-          //       }
-
-          //       try {
-          //         const response: types.openai.CreateChatCompletionDeltaResponse
-          //           = JSON.parse(data)
-
-          //         if (response.id)
-          //           result.id = response.id
-
-          //         if (response?.choices?.length) {
-          //           const delta = response.choices[0].delta
-          //           result.delta = delta.content
-          //           if (delta?.content)
-          //             result.text += delta.content
-          //           result.detail = response
-
-          //           if (delta.role)
-          //             result.role = delta.role
-
-          //           onProgress?.(result)
-          //         }
-          //       }
-          //       catch (err) {
-          //         console.warn('OpenAI stream SEE event unexpected error', err)
-          //         return reject(err)
-          //       }
-          //     },
-          //   },
-          //   this._fetch,
-          // ).catch(reject)
+            this._fetch,
+          ).catch(reject)
         }
         else {
           try {
@@ -323,6 +281,170 @@ export class ChatGPTAPI {
             result.detail = response
 
             return resolve(result)
+          }
+          catch (err) {
+            return reject(err)
+          }
+        }
+      },
+    ).then((message) => {
+      return this._upsertMessage(message).then(() => message)
+    })
+
+    if (timeoutMs) {
+      if (abortController) {
+        // This will be called when a timeout occurs in order for us to forcibly
+        // ensure that the underlying HTTP request is aborted.
+        (responseP as any).cancel = () => {
+          abortController.abort()
+        }
+      }
+
+      return pTimeout(responseP, {
+        milliseconds: timeoutMs,
+        message: 'OpenAI timed out waiting for response',
+      })
+    }
+    else {
+      return responseP
+    }
+  }
+
+  /**
+   * Sends a message to the OpenAI chat completions endpoint, waits for the response
+   * to resolve, and returns the response.
+   *
+   * If you want your response to have historical context, you must provide a valid `parentMessageId`.
+   *
+   * If you want to receive a stream of partial responses, use `opts.onProgress`.
+   *
+   * Set `debug: true` in the `ChatGPTAPI` constructor to log more info on the full prompt sent to the OpenAI chat completions API. You can override the `systemMessage` in `opts` to customize the assistant's instructions.
+   *
+   * @param message - The prompt message to send
+   * @param opts.parentMessageId - Optional ID of the previous message in the conversation (defaults to `undefined`)
+   * @param opts.messageId - Optional ID of the message to send (defaults to a random UUID)
+   * @param opts.systemMessage - Optional override for the chat "system message" which acts as instructions to the model (defaults to the ChatGPT system message)
+   * @param opts.timeoutMs - Optional timeout in milliseconds (defaults to no timeout)
+   * @param opts.onProgress - Optional callback which will be invoked every time the partial response is updated
+   * @param opts.abortSignal - Optional callback used to abort the underlying `fetch` call using an [AbortController](https://developer.mozilla.org/en-US/docs/Web/API/AbortController)
+   * @param completionParams - Optional overrides to send to the [OpenAI chat completion API](https://platform.openai.com/docs/api-reference/chat/create). Options like `temperature` and `presence_penalty` can be tweaked to change the personality of the assistant.
+   *
+   * @returns The response from ChatGPT
+   */
+  async sendMessageByLangchain(
+    text: string,
+    chain: TaogeQA,
+    opts: types.SendMessageOptions = {},
+  ): Promise<types.ChatMessage> {
+    const {
+      parentMessageId,
+      messageId = uuidv4(),
+      timeoutMs,
+      onProgress,
+      stream = !!onProgress,
+      completionParams,
+    } = opts
+
+    let { abortSignal } = opts
+
+    let abortController: AbortController = null
+    if (timeoutMs && !abortSignal) {
+      abortController = new AbortController()
+      abortSignal = abortController.signal
+    }
+
+    const message: types.ChatMessage = {
+      role: 'user',
+      id: messageId,
+      parentMessageId,
+      text,
+    }
+    await this._upsertMessage(message)
+
+    const { messages, maxTokens, numTokens } = await this._buildMessages(
+      text,
+      opts,
+    )
+
+    const result: types.ChatMessage = {
+      role: 'assistant',
+      id: uuidv4(),
+      parentMessageId: messageId,
+      text: '',
+    }
+
+    const responseP = new Promise<types.ChatMessage>(
+      async (resolve, reject) => {
+        const body = {
+          max_tokens: maxTokens,
+          ...this._completionParams,
+          ...completionParams,
+          messages,
+          stream,
+        }
+
+        if (this._debug)
+          console.log(`sendMessage (${numTokens} tokens)`, body)
+
+        if (stream) {
+          chain.call(text, {
+            onMessage: (data: string, runId: string, parentRunId: string) => {
+              // if (data === '[DONE]') {
+              //   result.text = result.text.trim()
+              //   return resolve(result)
+              // }
+              try {
+                // const response: types.openai.CreateChatCompletionDeltaResponse
+                //   = JSON.parse(data)
+
+                if (runId) {
+                  result.id = runId
+                  result.parentMessageId = parentRunId
+                }
+
+                // if (response?.choices?.length) {
+                //   const delta = response.choices[0].delta
+                //   result.delta = delta.content
+                //   if (delta?.content)
+                //     result.text += delta.content
+                //   result.detail = response
+
+                //   if (delta.role)
+                //     result.role = delta.role
+
+                //   onProgress?.(result)
+                // }
+                if (data) {
+                  result.text += data
+                  onProgress?.(result)
+                }
+              }
+              catch (err) {
+                console.warn('OpenAI stream SEE event unexpected error', err)
+                return reject(err)
+              }
+            },
+            onEnd: (output, runId, parentRunId) => {
+              console.log(`onEnd runId=${runId}, parentRunId=${parentRunId}, output=${output}`)
+              result.text = result.text.trim()
+              return resolve(result)
+            },
+          })
+        }
+        else {
+          try {
+            chain.call(text, {
+              onEnd(output, runId, parentRunId) {
+                if (this._debug)
+                  console.log(output.generations)
+                if (output.generations[0][0].generationInfo?.isError)
+                  return reject(output.generations[0][0].generationInfo)
+
+                result.text = output.generations[0][0].text
+                result.id = runId
+                return resolve(result)
+              },
+            })
           }
           catch (err) {
             return reject(err)
