@@ -1,4 +1,3 @@
-/* eslint-disable unused-imports/no-unused-vars */
 /* eslint-disable no-async-promise-executor */
 /* eslint-disable no-console */
 import Keyv from 'keyv'
@@ -387,6 +386,8 @@ export class ChatGPTAPI {
         if (this._debug)
           console.log(`sendMessage (${numTokens} tokens)`, body)
 
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        const that = this
         if (stream) {
           chain.call(text, {
             onMessage: (data: string, runId: string, parentRunId: string) => {
@@ -421,14 +422,22 @@ export class ChatGPTAPI {
                 }
               }
               catch (err) {
-                console.warn('OpenAI stream SEE event unexpected error', err)
+                console.error('OpenAI stream SEE event unexpected error', err)
                 return reject(err)
               }
             },
             onEnd: (output, runId, parentRunId) => {
-              console.log(`onEnd runId=${runId}, parentRunId=${parentRunId}, output=${output}`)
+              if (that._debug)
+                console.log(`onEnd runId=${runId}, parentRunId=${parentRunId}, output=${output}`)
               result.text = result.text.trim()
               return resolve(result)
+            },
+            onError(err, runId, parentRunId) {
+              if (that._debug)
+                console.error(`onError runId=${runId}, parentRunId=${parentRunId}, err=${err}`)
+
+              result.id = runId
+              return reject(err)
             },
           })
         }
@@ -436,14 +445,18 @@ export class ChatGPTAPI {
           try {
             chain.call(text, {
               onEnd(output, runId, parentRunId) {
-                if (this._debug)
-                  console.log(output.generations)
-                if (output.generations[0][0].generationInfo?.isError)
-                  return reject(output.generations[0][0].generationInfo)
-
-                result.text = output.generations[0][0].text
+                if (that._debug)
+                  console.log(`onEnd runId=${runId}, parentRunId=${parentRunId}, output=${output}`)
+                const res = output.generations[0][0]
+                result.text = res.text
                 result.id = runId
                 return resolve(result)
+              },
+              onError(err, runId, parentRunId) {
+                if (that._debug)
+                  console.error(`onError runId=${runId}, parentRunId=${parentRunId}, err=${err}`)
+                result.id = runId
+                return reject(err)
               },
             })
           }
