@@ -18,7 +18,9 @@
     "type-check": "vue-tsc --noEmit",
     "bootstrap": "pnpm install && pnpm run common:prepare",
     "common:cleanup": "rimraf node_modules && rimraf pnpm-lock.yaml",
-    "common:prepare": "husky install"
+    "common:prepare": "husky install",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@traptitech/markdown-it-katex": "^3.6.0",
