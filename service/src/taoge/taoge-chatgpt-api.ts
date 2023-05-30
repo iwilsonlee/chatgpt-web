@@ -1,3 +1,4 @@
+/* eslint-disable unused-imports/no-unused-vars */
 /* eslint-disable no-async-promise-executor */
 /* eslint-disable no-console */
 import Keyv from 'keyv'
