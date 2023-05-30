@@ -5,7 +5,7 @@ import pTimeout from 'p-timeout'
 import QuickLRU from 'quick-lru'
 import { v4 as uuidv4 } from 'uuid'
 
-import * as types from 'chatgpt'
+import * as types from './types'
 import { fetch as globalFetch } from './fetch'
 import { fetchSSE } from './fetch-sse'
 import * as tokenizer from './tokenizer'
@@ -353,13 +353,13 @@ export class ChatGPTAPI {
       abortSignal = abortController.signal
     }
 
-    const message: types.ChatMessage = {
-      role: 'user',
-      id: messageId,
-      parentMessageId,
-      text,
-    }
-    await this._upsertMessage(message)
+    // const message: types.ChatMessage = {
+    //   role: 'user',
+    //   id: messageId,
+    //   parentMessageId,
+    //   text,
+    // }
+    // await this._upsertMessage(message)
 
     const { messages, maxTokens, numTokens } = await this._buildMessages(
       text,
@@ -389,7 +389,7 @@ export class ChatGPTAPI {
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const that = this
         if (stream) {
-          chain.call(text, {
+          chain.call(text, parentMessageId, {
             onMessage: (data: string, runId: string, parentRunId: string) => {
               // if (data === '[DONE]') {
               //   result.text = result.text.trim()
@@ -443,7 +443,7 @@ export class ChatGPTAPI {
         }
         else {
           try {
-            chain.call(text, {
+            chain.call(text, parentMessageId, {
               onEnd(output, runId, parentRunId) {
                 if (that._debug)
                   console.log(`onEnd runId=${runId}, parentRunId=${parentRunId}, output=${output}`)

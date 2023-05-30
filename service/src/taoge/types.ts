@@ -86,6 +86,12 @@ export type GetMessageByIdFunction = (id: string) => Promise<ChatMessage>
 /** Upserts a chat message to a store. */
 export type UpsertMessageFunction = (message: ChatMessage) => Promise<void>
 
+/** Returns a chat message from a store by it's ID (or null if not found). */
+export type GetMessageByIdAndQuestionFunction = (id: string, question: string) => Promise<string>
+
+/** Upserts a chat message to a store. */
+export type UpsertMessageByConversationIdAndContentFunction = (conversationId: string, content: { input: string; output: string }) => Promise<void>
+
 /**
  * https://chat.openapi.com/backend-api/conversation
  */

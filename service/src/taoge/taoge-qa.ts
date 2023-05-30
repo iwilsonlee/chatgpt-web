@@ -16,6 +16,8 @@ import { Document } from 'langchain/document'
 import type { BaseLLM } from 'langchain/llms'
 import type { SaveableVectorStore } from 'langchain/vectorstores'
 import type { LLMResult } from 'langchain/dist/schema'
+import QuickLRU from 'quick-lru'
+import { v4 as uuidv4 } from 'uuid'
 import { VectorFaissService } from '../services/vector-faiss-service'
 
 dotenv.config()
@@ -28,30 +30,62 @@ dotenv.config()
 //   output: process.stdout,
 // })
 
-class TaogeMemory {
+export class TaogeMemory {
   private embeddings: OpenAIEmbeddings
-  private memory: VectorStoreRetrieverMemory
-  private memoryStore: MemoryVectorStore
+  // private memory: VectorStoreRetrieverMemory
+  // private memoryStore: MemoryVectorStore
+  private memories: QuickLRU<string, MemoryVectorStore>
 
   constructor(embeddings?: OpenAIEmbeddings) {
     this.embeddings = embeddings || new OpenAIEmbeddings()
-    this.memoryStore = new MemoryVectorStore(this.embeddings)
-    this.memory = new VectorStoreRetrieverMemory({
-      vectorStoreRetriever: this.memoryStore.asRetriever(3),
+    // this.memoryStore = new MemoryVectorStore(this.embeddings)
+    // this.memory = new VectorStoreRetrieverMemory({
+    //   vectorStoreRetriever: this.memoryStore.asRetriever(3),
+    //   memoryKey: 'history',
+    // })
+    this.memories = new QuickLRU<string, MemoryVectorStore>({ maxSize: 100 })
+  }
+
+  async _loadMemory(memoryStore: MemoryVectorStore): Promise<VectorStoreRetrieverMemory> {
+    return new VectorStoreRetrieverMemory({
+      vectorStoreRetriever: memoryStore.asRetriever(3),
       memoryKey: 'history',
     })
   }
 
-  async saveHistory(input: string, output: string) {
-    await this.memory.saveContext({ input }, { output })
+  /**
+   * Save history to memory
+   * @param conversationId
+   * @param content
+   * @returns
+   */
+  async saveHistoryMemory(conversationId: string, content: { input: string; output: string }) {
+    const memoryStore = this.memories.get(conversationId) || new MemoryVectorStore(this.embeddings)
+    const memory = await this._loadMemory(memoryStore)
+    const { input, output } = content
+    await memory.saveContext({ input }, { output })
+    this.memories.set(conversationId, memoryStore)
   }
 
-  async loadHistoryMemory(question: string) {
-    const history_entity = await this.memory.loadMemoryVariables({ prompt: question })
-    console.log(`history_entity=${JSON.stringify(history_entity)}`)
-    return history_entity.history
+  /**
+   * Load history from memory
+   * @param conversationId
+   * @param question
+   */
+  async loadHistoryMemory(conversationId: string, question: string): Promise<string | null> {
+    const memoryStore = this.memories.get(conversationId)
+    if (memoryStore) {
+      const memory = await this._loadMemory(memoryStore)
+      const history_entity = await memory.loadMemoryVariables({ prompt: question })
+      console.log(`history_entity=${JSON.stringify(history_entity)}`)
+      return history_entity.history
+    }
+    return null
   }
 }
+
+export type LoadHistory = (question: string) => Promise<string | null>
+export type SaveHistory = (answer: string) => Promise<void>
 
 export class TaogeQA {
   private llm: BaseLLM
@@ -60,11 +94,11 @@ export class TaogeQA {
   private memory: TaogeMemory
   private vectorStore: SaveableVectorStore
 
-  constructor(llm: BaseLLM, embeddings: OpenAIEmbeddings, vectorStore: SaveableVectorStore, params: QAChainParams = {}) {
+  constructor(llm: BaseLLM, memory: TaogeMemory, vectorStore: SaveableVectorStore, params: QAChainParams = {}) {
     const { type = 'stuff', verbose = false } = params
     this.verbose = verbose
     this.llm = llm
-    this.memory = new TaogeMemory(embeddings)
+    this.memory = memory
     this.vectorStore = vectorStore
     this.chain = loadQAChain(this.llm, { prompt: this.createPrompt(), type, verbose: this.verbose })
   }
@@ -86,8 +120,8 @@ export class TaogeQA {
     return chatPrompt
   }
 
-  private async generateContext(question: string) {
-    const historySummarize = await this.memory.loadHistoryMemory(question)
+  private async generateContext(question: string, conversationId: string): Promise<Document[]> {
+    const historySummarize = await this.memory.loadHistoryMemory(conversationId, question)
     console.log(`historySummarize=${historySummarize}`)
     const inputDocuments = await this.vectorStore.similaritySearch(question, 2)
     if (historySummarize && inputDocuments) {
@@ -112,8 +146,8 @@ export class TaogeQA {
     return result
   }
 
-  public async call(question: string, options?, maxTokens?: 256): Promise<string> {
-    const inputDocuments = await this.generateContext(question)
+  public async call(question: string, conversationId: string, options?, maxTokens?: 256): Promise<string> {
+    const inputDocuments = await this.generateContext(question, conversationId)
     const { onMessage, onEnd, onError } = options
     let res
     let n = 0
@@ -147,7 +181,7 @@ export class TaogeQA {
       if (res &&	res.text) {
         console.log(`langchain res=${JSON.stringify(res)}`)
         answer = this.filterString(res.text)
-        await this.memory.saveHistory(question, answer)
+        this.memory.saveHistoryMemory(conversationId, { input: question, output: answer })
       }
       else {
         n++
@@ -205,7 +239,9 @@ export default async function run(question: string,
 
   // return
 
-  const taogeQA = new TaogeQA(model, embeddings, vectorStore, { verbose: true })
+  const memory = new TaogeMemory(embeddings)
+
+  const taogeQA = new TaogeQA(model, memory, vectorStore, { verbose: true })
 
   // const qas = [
   //   '物流行业的无人驾驶公司有哪些？',
@@ -226,7 +262,8 @@ export default async function run(question: string,
   //   console.log(`Answer: ${answer || 'nothing'}`)
   //   n++
   // }
-  return await taogeQA.call(question, options)
+  const conversationId = uuidv4() // generate
+  return await taogeQA.call(question, conversationId, options)
 }
 
 // run()

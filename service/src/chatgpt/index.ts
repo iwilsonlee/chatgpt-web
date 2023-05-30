@@ -6,7 +6,7 @@ import httpsProxyAgent from 'https-proxy-agent'
 import fetch from 'node-fetch'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
 import { OpenAI } from 'langchain/llms/openai'
-import { TaogeQA } from '../taoge/taoge-qa'
+import { TaogeMemory, TaogeQA } from '../taoge/taoge-qa'
 import type { ChatGPTAPIOptions, ChatMessage, SendMessageOptions } from '../taoge'
 import { ChatGPTAPI } from '../taoge'
 import { sendResponse } from '../utils'
@@ -71,12 +71,14 @@ let chain: TaogeQA
 
     // setupProxy(options)
 
+    const embeddings = new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY })
+    const memory = new TaogeMemory(embeddings)
+
     api = new ChatGPTAPI({ ...options })
     apiModel = 'ChatGPTAPI'
 
     // Initialize the LLM to use to answer the question.
     const DATA_STORE_DIR = '/workspaces/chatgpt-web/data_store_PyPDFLoader2'
-    const embeddings = new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY })
 
     // Initialize the LLM to use to answer the question.
     const llm = new OpenAI({ modelName: 'gpt-3.5-turbo', openAIApiKey: process.env.OPENAI_API_KEY, temperature: 0.2, maxTokens: 256, streaming: true })
@@ -94,7 +96,7 @@ let chain: TaogeQA
 
     else
       console.log(`Loading vector store from ${DATA_STORE_DIR}`)
-    chain = new TaogeQA(llm, embeddings, vectorStore, { verbose: true })
+    chain = new TaogeQA(llm, memory, vectorStore, { verbose: true })
   }
 })()
 
