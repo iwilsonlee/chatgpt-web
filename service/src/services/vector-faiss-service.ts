@@ -100,10 +100,10 @@ export class VectorFaissService {
     }
   }
 
-  public similaritySearch(question: string, k = 3): any {
+  public async similaritySearch(question: string, k = 3): Promise<any> {
     if (!this.vectorStore)
       throw new Error('vectorStore has not been initialized, you need to initialize first.')
 
-    return this.vectorStore.similaritySearch(question, k)
+    return await this.vectorStore.similaritySearch(question, k)
   }
 }
