@@ -18,8 +18,8 @@
       "name": "Launch Service Server",
       "runtimeExecutable": "${workspaceFolder}/service/node_modules/.bin/esno",
       "skipFiles": ["<node_internals>/**"],
-      // "program": "${workspaceFolder}/service/src/index.ts",
-      "program": "${workspaceFolder}/service/src/chatgpt/conversation.ts",
+      "program": "${workspaceFolder}/service/src/index.ts",
+      // "program": "${workspaceFolder}/service/src/chatgpt/qa.ts",
       // "outFiles": ["${workspaceFolder}/service/**/*.js"],
       "envFile": "${workspaceFolder}/service/.env"
     }
