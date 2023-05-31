@@ -114,9 +114,9 @@ async function chatReplyProcessByLangchain(options: RequestOptions) {
     if (lastContext != null) {
       if (apiModel === 'ChatGPTAPI') {
         options.parentMessageId = lastContext.parentMessageId
-				options.conversationId = lastContext.conversationId
-			} else
-        options = { ...lastContext }
+        options.conversationId = lastContext.conversationId
+      }
+      else { options = { ...lastContext } }
     }
 
     const response = await api.sendMessageByLangchain(message, chain, {

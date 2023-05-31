@@ -93,11 +93,11 @@ async function onConversation() {
   if (lastContext && usingContext.value)
     options = { ...lastContext }
 
-	if(currentChatHistory) {
-		const conversationId = (currentChatHistory as unknown as Chat.History).uuid
-		// 将conversationId转为string类型并追加到options内
-		options = { ...options, conversationId: conversationId.toString() }
-	}
+  if (currentChatHistory.value) {
+    const conversationId = (currentChatHistory as unknown as Chat.History).uuid
+    // 将conversationId转为string类型并追加到options内
+    options = { ...options, conversationId: conversationId.toString() }
+  }
 
   addChat(
     +uuid,

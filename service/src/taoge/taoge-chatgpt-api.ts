@@ -338,8 +338,8 @@ export class ChatGPTAPI {
     opts: types.SendMessageOptionsByLangchain = {},
   ): Promise<types.ChatMessage> {
     const {
-      parentMessageId,
-			conversationId,
+      // parentMessageId,
+      conversationId,
       messageId = uuidv4(),
       timeoutMs,
       onProgress,
