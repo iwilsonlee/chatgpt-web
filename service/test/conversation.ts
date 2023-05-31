@@ -15,7 +15,7 @@ import { MemoryVectorStore } from 'langchain/vectorstores/memory'
 import { VectorStoreRetrieverMemory } from 'langchain/memory'
 import { Document } from 'langchain/document'
 import { PDFLoader } from 'langchain/document_loaders/fs/pdf'
-import { VectorFaissService } from '../services/vector-faiss-service'
+import { VectorFaissService } from '../src/services/vector-faiss-service'
 
 dotenv.config()
 
