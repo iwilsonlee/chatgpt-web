@@ -3,7 +3,7 @@ import dotenv from 'dotenv'
 import cors from 'cors'
 import type { RequestProps } from './types'
 import type { ChatMessage } from './chatgpt'
-import { chatConfig, chatReplyProcess, currentModel } from './chatgpt'
+import { chatConfig, chatReplyProcess, chatReplyProcessByLangchain, currentModel } from './chatgpt'
 import { authMiddleware } from './middleware/auth'
 import { isNotEmptyString } from './utils/is'
 import { limiter } from './middleware/limiter'
@@ -33,7 +33,8 @@ router.post('/chat-process', [authMiddleware, limiter], async (req, res) => {
   try {
     const { prompt, options = {}, systemMessage, temperature, top_p } = req.body as RequestProps
     let firstChunk = true
-    await chatReplyProcess({
+    // await chatReplyProcess({
+    await chatReplyProcessByLangchain({
       message: prompt,
       lastContext: options,
       process: (chat: ChatMessage) => {
