@@ -73,14 +73,11 @@ export class TaogeMemory {
    * @param question
    */
   async loadHistoryMemory(conversationId: string, question: string): Promise<string | null> {
-    const memoryStore = this.memories.get(conversationId)
-    if (memoryStore) {
-      const memory = await this._loadMemory(memoryStore)
-      const history_entity = await memory.loadMemoryVariables({ prompt: question })
-      console.log(`history_entity=${JSON.stringify(history_entity)}`)
-      return history_entity.history
-    }
-    return null
+    const memoryStore = this.memories.get(conversationId) || new MemoryVectorStore(this.embeddings)
+    const memory = await this._loadMemory(memoryStore)
+    const history_entity = await memory.loadMemoryVariables({ prompt: question })
+    console.log(`history_entity=${JSON.stringify(history_entity)}`)
+    return history_entity.history
   }
 }
 
