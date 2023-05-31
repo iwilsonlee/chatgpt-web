@@ -38,7 +38,7 @@ const { uuid } = route.params as { uuid: string }
 
 const dataSources = computed(() => chatStore.getChatByUuid(+uuid))
 const conversationList = computed(() => dataSources.value.filter(item => (!item.inversion && !!item.conversationOptions)))
-const currentChatHistory = computed(() => chatStore.getChatHistoryByCurrentActive)
+const currentChatHistory = computed(() => usingContext ? chatStore.getChatHistoryByCurrentActive : null)
 
 const prompt = ref<string>('')
 const loading = ref<boolean>(false)
@@ -93,8 +93,8 @@ async function onConversation() {
   if (lastContext && usingContext.value)
     options = { ...lastContext }
 
-  if (currentChatHistory.value) {
-    const conversationId = (currentChatHistory as unknown as Chat.History).uuid
+  if (currentChatHistory?.value) {
+    const conversationId = (currentChatHistory.value as unknown as Chat.History).uuid
     // 将conversationId转为string类型并追加到options内
     options = { ...options, conversationId: conversationId.toString() }
   }
@@ -227,6 +227,12 @@ async function onRegenerate(index: number) {
 
   if (requestOptions.options)
     options = { ...requestOptions.options }
+
+  if (currentChatHistory?.value) {
+    const conversationId = (currentChatHistory.value as unknown as Chat.History).uuid
+    // 将conversationId转为string类型并追加到options内
+    options = { ...options, conversationId: conversationId.toString() }
+  }
 
   loading.value = true
 

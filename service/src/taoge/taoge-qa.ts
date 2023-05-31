@@ -125,8 +125,11 @@ export class TaogeQA {
   }
 
   private async generateContext(question: string, conversationId: string): Promise<Document[]> {
-    const historySummarize = await this.memory.loadHistoryMemory(conversationId, question)
-    console.log(`historySummarize=${historySummarize}`)
+    let historySummarize
+    if (conversationId) {
+      historySummarize = await this.memory.loadHistoryMemory(conversationId, question)
+      console.log(`historySummarize=${historySummarize}`)
+    }
     const inputDocuments = await this.vectorStore.similaritySearch(question, 2)
     if (historySummarize && inputDocuments) {
       const newDocuments = new Document({ pageContent: historySummarize, metadata: { source: 'Chat History' } })
@@ -185,7 +188,8 @@ export class TaogeQA {
       if (res &&	res.text) {
         console.log(`langchain res=${JSON.stringify(res)}`)
         answer = this.filterString(res.text)
-        this.memory.saveHistoryMemory(conversationId, { input: question, output: answer })
+        if (conversationId)
+          await this.memory.saveHistoryMemory(conversationId, { input: question, output: answer })
       }
       else {
         n++
