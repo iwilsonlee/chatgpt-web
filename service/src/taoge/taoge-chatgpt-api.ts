@@ -335,10 +335,11 @@ export class ChatGPTAPI {
   async sendMessageByLangchain(
     text: string,
     chain: TaogeQA,
-    opts: types.SendMessageOptions = {},
+    opts: types.SendMessageOptionsByLangchain = {},
   ): Promise<types.ChatMessage> {
     const {
       parentMessageId,
+			conversationId,
       messageId = uuidv4(),
       timeoutMs,
       onProgress,
@@ -390,7 +391,7 @@ export class ChatGPTAPI {
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const that = this
         if (stream) {
-          chain.call(text, parentMessageId, {
+          chain.call(text, conversationId, {
             onMessage: (data: string, runId: string, parentRunId: string) => {
               // if (data === '[DONE]') {
               //   result.text = result.text.trim()
@@ -444,7 +445,7 @@ export class ChatGPTAPI {
         }
         else {
           try {
-            chain.call(text, parentMessageId, {
+            chain.call(text, conversationId, {
               onEnd(output, runId, parentRunId) {
                 if (that._debug)
                   console.log(`onEnd runId=${runId}, parentRunId=${parentRunId}, output=${output}`)

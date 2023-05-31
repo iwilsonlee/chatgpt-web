@@ -7,7 +7,7 @@ import fetch from 'node-fetch'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
 import { OpenAI } from 'langchain/llms/openai'
 import { TaogeMemory, TaogeQA } from '../taoge/taoge-qa'
-import type { ChatGPTAPIOptions, ChatMessage, SendMessageOptions } from '../taoge'
+import type { ChatGPTAPIOptions, ChatMessage, SendMessageOptions, SendMessageOptionsByLangchain } from '../taoge'
 import { ChatGPTAPI } from '../taoge'
 import { sendResponse } from '../utils'
 import { isNotEmptyString } from '../utils/is'
@@ -103,7 +103,7 @@ let chain: TaogeQA
 async function chatReplyProcessByLangchain(options: RequestOptions) {
   const { message, lastContext, process, systemMessage, temperature, top_p } = options
   try {
-    let options: SendMessageOptions = { timeoutMs }
+    let options: SendMessageOptionsByLangchain = { timeoutMs }
 
     if (apiModel === 'ChatGPTAPI') {
       if (isNotEmptyString(systemMessage))
@@ -112,9 +112,10 @@ async function chatReplyProcessByLangchain(options: RequestOptions) {
     }
 
     if (lastContext != null) {
-      if (apiModel === 'ChatGPTAPI')
+      if (apiModel === 'ChatGPTAPI') {
         options.parentMessageId = lastContext.parentMessageId
-      else
+				options.conversationId = lastContext.conversationId
+			} else
         options = { ...lastContext }
     }
 

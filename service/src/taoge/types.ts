@@ -47,6 +47,22 @@ export interface SendMessageOptions {
   >
 }
 
+export interface SendMessageOptionsByLangchain {
+  /** The name of a user in a multi-user chat. */
+  name?: string
+  parentMessageId?: string
+  conversationId?: string
+  messageId?: string
+  stream?: boolean
+  systemMessage?: string
+  timeoutMs?: number
+  onProgress?: (partialResponse: ChatMessage) => void
+  abortSignal?: AbortSignal
+  completionParams?: Partial<
+    Omit<openai.CreateChatCompletionRequest, 'messages' | 'n' | 'stream'>
+  >
+}
+
 export type MessageActionType = 'next' | 'variant'
 
 export interface SendMessageBrowserOptions {
